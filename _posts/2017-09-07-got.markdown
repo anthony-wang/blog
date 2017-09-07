@@ -1,0 +1,48 @@
+---
+layout: post
+title:  "What's up with Stannis Baratheon in the Game of Thrones network?"
+date:   2017-09-07 16:00 +0200
+---
+
+While browsing the amazing world wide web I came across this [wondeful blog](https://networkofthrones.wordpress.com) by Andrew J. Beveridge, an associate professor of mathematics at Macalester College, and Jie Shan. They created a network from the book A Storm of Swords by extracting relationships between characters to find out the most important characters in the book.
+The [Math Horizons Article](https://www.maa.org/sites/default/files/pdf/Mathhorizons/NetworkofThrones%20%281%29.pdf) and  they have also uploaded the data on GitHub, so even you can play around with this [data](https://github.com/mathbeveridge/asoiaf).
+
+So, I decided to play around a bit with this network and I wanted to have a look at the evolution of characters of this network over the 5 books.
+We have a character network where nodes are the characters and the edges are weighted edges which represent interactions between these characters(nodes).
+
+```
+# we use networkx to work with this network, G is a Graph object
+# nodes of the Graph, i.e characters of in this interaction network 
+>>> G.nodes()
+['Addam-Marbrand', 'Brynden-Tully', 'Cersei-Lannister', 'Jaime-Lannister', 'Lyle-Crakehall', 'Aegon-Targaryen-(son-of-Rhaegar)', 'Rhaegar-Targaryen', ... ]
+# edges of the Graph
+# the two attributes in the graph specifiy the book(1-5) that the interaction belongs to
+# and the weight specifies the number of interactions between those two characters in that specific book
+>>> G.edges(data=True)
+[('Addam-Marbrand', 'Brynden-Tully', {'weight': 3, 'book': 4}), ('Addam-Marbrand', 'Cersei-Lannister', {'weight': 3, 'book': 4}), ('Addam-Marbrand', 'Jaime-Lannister', {'weight': 8, 'book': 4}) ..... ]
+``` 
+
+Once we have the network let's look at some basic measures of this network that can tell us about important characters(nodes) in this network.
+
+A basic way to calculate the importance of a node is to count the number of neighbors a node is connected, i.e degree of a node. We calculate the [degree centrality](https://en.wikipedia.org/wiki/Centrality#Degree_centrality) (a fancy name for normalised degree) and then look at the top 10 characters according to this measure over the five books and have a look at their evolution.
+
+![](../imgs/degreecentrality.png)
+
+So we see some familiar names, Eddard Stark, Tyrion, Jon Snow, Cersei, Daenerys. Hmmm.. So I guess this kind of gives us a good picture or maybe not.
+Degree centrality takes into account just the degree i.e. just the neighbors of a character, it has no other information about the network.
+
+So, now let's have a look at a different measure, [betweenness centrality](https://en.wikipedia.org/wiki/Betweenness_centrality), which basically finds nodes in the network that are in the path of most shortest paths in the network.  You can go through the wikipedia page for some more infomation on it.
+
+Let's do the plotting thing again, we look at the top 10 characters according to betweenness centrality.
+![](../imgs/betcent.png)
+Woah, Stannis Baratheon is beating everyone in this measure in the later books but the strange thing is that he is not even in the top 10 of degree centrality(over the period of all 5 books), well what can we say about this?
+
+If we look at the absolute ranking, in the 4th book Stannis is the 9th most important character according to degree centrality but the most important according to betweenness centrality, the difference reduces in the 5th book to 3rd most important accoridng to degree centrality.
+
+The difference in these measures comes in from the fact we calculate the importance and what makes the node important (in our opinion), plain ol' degree or the structure of the network. A simple example to work through thi difference is a barbell graph.
+![](../imgs/barbell.png)
+
+If we calculate degree centrality then node 5 will have the least importance as it connected to only 2 nodes, i.e the degree is only 2, but that is weird right? If anything happens to node 5 it essentially breaks up the network (which could be a bad thing). Betweenness centrality to the rescue, as you can see all the paths from the right side of the network have to pass through the node 5 to reach nodes in the left side, betweenness centrality gives the node 5 the highest importance.
+
+So coming back to Game of Thrones, maybe we can infer that Stannis is the glue between two different groups in the network which gives Stannis importance in the network, even though it is not connected to most number of characters.
+
