@@ -1,0 +1,189 @@
+---
+layout: post
+title:  "Let's play with the Indian Airport Network"
+date:   2017-09-20 23:40 +0200
+---
+
+Just like any other day I decided today to finally start reading the papers I am **supposed** to read and do the work I am **supposed** to do, but the human mind is a fascinating creature. For some random reason I ended up at [Open Government Data (OGD) website](https://data.gov.in), I knew about this for a long time but was too lazy to poke around the data, but this time I found something interesting on the homepage, the dataset of [flight schedule in India](https://data.gov.in/catalog/airsewa). Hmmm, Interesting. I like networks and planes. So let's see what can get out of this dataset.
+
+Let's have a look at the data (I am not able to find the any description available for this), it has the following fields:
+
+- LOCAL_AIRPORT
+- AIRLINE_CODE
+- FLIGHT_NUMBER
+- FREQUENCY
+- ARRIVAL\_DEPARTURE_FLAG
+- SOURCE_DESTINATION
+- SCHED_TIME
+- TIME_ZONE
+- EFF\_DT_FROM
+- EFF\_DT_TILL
+
+As we can see we have a pretty interesting dataset here. We have a lot of information, but first let't start with the basics. We create a network from this dataset using only the `LOCAL_AIRPORT` and `SOURCE_DESTINATION` fields. In this network the nodes are the airport and the edges are the flights.
+
+We'll use the python ecosystem to work with data.
+
+```
+import networkx as nx
+# Create a directed graph object, as this is a directed network.
+# Flight from A->B doesn't mean B->A.
+G = nx.DiGraph()
+``` 
+
+We populate the this graph and find that there are 66 active airport(nodes) and 466 edges between them, i.e. flight routes not actual flights, in total there are 6406 fligts between these airports in this dataset.
+
+One of the reasons I want to do this analysis is to check if there are any suprising results in this dataset, like the one in the US Aiport Dataset. If we try to find the most important node(i.e. airport) in the network using usual network measures like [betweenness centrality](https://en.wikipedia.org/wiki/Betweenness_centrality) and [pagerank](https://en.wikipedia.org/wiki/PageRank)(the google algorithm), the result is Anchorage, Alaska, which is surprising. A nice blog post regarding this is available at [https://toreopsahl.com/2011/08/12/why-anchorage-is-not-that-important-binary-ties-and-sample-selection/](https://toreopsahl.com/2011/08/12/why-anchorage-is-not-that-important-binary-ties-and-sample-selection/).
+
+Coming back to the Indian flight network that we have built, let's find the most important aiport in this network using the standard bsaic measures available in network science.
+
+```
+In [1]: sorted(nx.betweenness_centrality(G).items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[1]:
+[('DEL', 0.2759455128205128),
+ ('BOM', 0.18375972985347988),
+ ('CCU', 0.13287431318681317),
+ ('HYD', 0.08129979395604396),
+ ('MAA', 0.06482715201465201)]
+
+```
+
+```
+In [2]: sorted(nx.pagerank(G).items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[2]:
+[('DEL', 0.08563593882704483),
+ ('BOM', 0.0754891991251404),
+ ('CCU', 0.05707856089233467),
+ ('HYD', 0.0568324233769467),
+ ('BLR', 0.053569833730958645)]
+```
+
+```
+In [3]: sorted(nx.degree_centrality(G).items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[3]:
+[('DEL', 1.3846153846153846),
+ ('BOM', 1.276923076923077),
+ ('HYD', 0.9384615384615385),
+ ('CCU', 0.9230769230769231),
+ ('BLR', 0.9076923076923078)]
+```
+
+Three different measures give us predictable results, this is something you would expect out of the network. The big hubs like Delhi, Mumbai, Hyderabad, Bengaluru come at top, but this was an unweighted network i.e. one flight from A->B is not different from 100 flights A->B. Let's add some weights to this network, but we need to be careful. We can't just count the number of flights from A to B as in this dataset the same flight could have a frequency of 7 (times a week) or 1. 
+
+Let's see if this made any difference.
+
+```
+In [4]: sorted(nx.pagerank(G).items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[4]:
+[('DEL', 0.15805082217856486),
+ ('BOM', 0.10541492871693034),
+ ('BLR', 0.08853450448604866),
+ ('CCU', 0.0651057908328595),
+ ('HYD', 0.06053497246925066)]
+```
+```
+In [5]: sorted(nx.betweenness_centrality(G, weight='weight').items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[5]:
+[('DEL', 0.2658653846153846),
+ ('BOM', 0.23729967948717953),
+ ('HYD', 0.1714342948717949),
+ ('IXZ', 0.1514423076923077),
+ ('CCU', 0.14266826923076925)]
+```
+
+We have a new entrant in the elite top 5 club 'IXZ'. Any guesses?
+
+Drum roll please........
+
+It's Port Blair ¯\\_ツ\_/¯
+
+Dafaq?
+
+Let's try to find out why?
+
+According to betweenness centrality Port Blair is important.
+
+From wikipedia
+
+> betweenness centrality is a measure of centrality in a graph based on shortest paths. For every pair of vertices in a connected graph, there exists at least one shortest path between the vertices such that either the number of edges that the path passes through (for unweighted graphs) or the sum of the weights of the edges (for weighted graphs) is minimized. The betweenness centrality for each vertex is the number of these shortest paths that pass through the vertex.
+
+So basically if a node(airport) is in a lot of shortest paths that runs through the network it is an important node. Well that makes sense to declare a node as important, but why would Port Blair suddenly come up after adding weights. Going back to how we added weights to this network, a busy route like Delhi to Mumbai will have a high weight, but how does that translate to betweenness centrality, is it a good thing to add weights in this particular manner? Betweenness Centrality tries to find shortest path and on weighted networks an edge with high weight should be avoided, but we don't want that. So instead let's add a new weight `inv` which is the inverse of `weight` and then checkout  betweenness centrality again using this weight.
+
+```
+In [6]: sorted(nx.betweenness_centrality(G, weight='inv').items(), key=lambda x:x[1], reverse=True)[0:5]
+Out[6]:
+[('DEL', 0.5973557692307693),
+ ('BOM', 0.23750000000000002),
+ ('CCU', 0.16322115384615385),
+ ('BLR', 0.11418269230769232),
+ ('MAA', 0.0983173076923077)]
+```
+
+Ahh, it looks like all is well. So lesson of the day: Just because something sounds fancy "weighted betweenness centrality" doesn't mean that it will give out some meaningful result. We need to make sure the data we are feeding is also done in a meaningful way.
+
+There is a lot more we can do with the dataset,
+
+For example this is the number of flight routes for airlines.
+
+```
+6E    2392
+9W    1212
+SG     818
+AI     616
+G8     550
+I5     274
+UK     256
+S2     156
+2T      90
+LB      42
+```
+
+IndiGo is waaayy ahead. Again to keep in my mind is this is flight routes, i.e. if a flight flies at 2:00 PM from A->B on Monday and at 2:05 PM from A->B on Tuesday they will be counted as seprate flights.
+
+We can also try to find hubs (by origin of flight) of the airlines.
+
+For IndiGo
+
+```
+DEL    389
+BLR    313
+BOM    222
+CCU    212
+HYD    194
+MAA    151
+```
+
+For Jet Airways:
+
+```
+DEL    222
+BOM    202
+BLR    159
+MAA    115
+CCU     68
+PNQ     42
+```
+
+For Air India
+
+```
+BOM    111
+DEL    109
+CCU     49
+MAA     32
+HYD     31
+BLR     26
+```
+
+For Air Costa
+
+```
+HYD    12
+BLR    10
+MAA     6
+JAI     5
+AMD     5
+```
+
+#### To be continued......
+
+PS: I will soon upload the ipython notebook on GitHub and let me know want you think :)
